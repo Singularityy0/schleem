@@ -1,0 +1,20 @@
+[package]
+name = "schmeckles-keeper"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+alloy = { version = "2", features = ["full"] }
+anyhow = "1"
+dotenvy = "0.15"
+hex = "0.4"
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2"
+
+[dev-dependencies]
+serde_json = "1"
