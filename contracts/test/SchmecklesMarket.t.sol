@@ -138,10 +138,27 @@ contract SchmecklesMarketTest is TestBase {
     function testSettlementRejectsReportOutsideExpiryWindow() public {
         uint256 epochId = _openEpoch();
         uint256 expiry = block.timestamp + market.EPOCH_DURATION();
-        vm.warp(expiry + 3);
-        oracle.submitPrice(404e8, uint64(expiry + 3));
+        uint256 outsideWindow = expiry + market.SETTLEMENT_OBSERVATION_WINDOW() + 1;
+        vm.warp(outsideWindow);
+        oracle.submitPrice(404e8, uint64(outsideWindow));
         vm.expectRevert(SchmecklesMarket.InvalidSettlementObservation.selector);
         market.settle(epochId, "");
+    }
+
+    function testSettlementAcceptsReportAtWindowUpperBound() public {
+        uint256 epochId = _openEpoch();
+        uint256 expiry = block.timestamp + market.EPOCH_DURATION();
+        uint256 upperBound = expiry + market.SETTLEMENT_OBSERVATION_WINDOW();
+        vm.warp(upperBound);
+        oracle.submitPrice(404e8, uint64(upperBound));
+
+        market.settle(epochId, "");
+
+        assertEq(
+            uint256(market.epochStatus(epochId)),
+            uint256(SchmecklesMarket.EpochStatus.Settled),
+            "upper-bound observation settles"
+        );
     }
 
     function testOpenRejectsStaleAndFutureLivePrices() public {

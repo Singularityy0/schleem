@@ -54,6 +54,7 @@ sol! {
         }
 
         function activeEpochId() external view returns (uint256);
+        function SETTLEMENT_OBSERVATION_WINDOW() external view returns (uint64);
         function epochStatus(uint256 epochId) external view returns (uint8);
         function getEpoch(uint256 epochId) external view returns (Epoch memory);
         function updateLivePrice(bytes calldata proof)
@@ -67,6 +68,7 @@ sol! {
 const MONAD_TESTNET_CHAIN_ID: u64 = 10_143;
 const MON_USDT_PAIR_ID: u32 = 569;
 const USDT_USD_PAIR_ID: u32 = 48;
+const CHAIN_ID_ATTEMPTS: u32 = 6;
 
 #[derive(Debug, Clone)]
 struct Config {
@@ -77,15 +79,18 @@ struct Config {
     supra_proof_url: String,
     poll_interval: Duration,
     live_update_interval: u64,
+    proof_chain_catchup: Duration,
     transaction_timeout: Duration,
     once: bool,
 }
 
 impl Config {
     fn from_env() -> Result<Self> {
+        // Prefer a keeper-specific .env when running from keeper/. Process-level
+        // variables supplied by the process continue to take highest priority.
+        let _ = dotenvy::dotenv();
         let _ = dotenvy::from_filename("contracts/.env");
         let _ = dotenvy::from_filename("../contracts/.env");
-        let _ = dotenvy::dotenv();
         let rpc_url = required("MONAD_RPC_URL")?
             .parse()
             .context("invalid MONAD_RPC_URL")?;
@@ -98,6 +103,8 @@ impl Config {
             .unwrap_or_else(|_| "https://rpc-testnet-dora-2.supra.com".into());
         let poll_milliseconds = env_number("KEEPER_POLL_MILLISECONDS", 1_000)?;
         let live_update_interval = env_number("LIVE_UPDATE_INTERVAL_SECONDS", 20)?;
+        let proof_chain_catchup =
+            Duration::from_millis(env_number("PROOF_CHAIN_CATCHUP_MILLISECONDS", 2_500)?);
         let transaction_timeout =
             Duration::from_secs(env_number("TRANSACTION_TIMEOUT_SECONDS", 45)?);
         let once = env::var("KEEPER_ONCE").is_ok_and(|value| value == "1" || value == "true");
@@ -113,6 +120,7 @@ impl Config {
             supra_proof_url: supra_proof_url.trim_end_matches('/').into(),
             poll_interval: Duration::from_millis(poll_milliseconds),
             live_update_interval,
+            proof_chain_catchup,
             transaction_timeout,
             once,
         })
@@ -173,10 +181,7 @@ async fn main() -> Result<()> {
         .with_chain_id(MONAD_TESTNET_CHAIN_ID)
         .wallet(signer)
         .connect_http(config.rpc_url.clone());
-    let chain_id = provider
-        .get_chain_id()
-        .await
-        .context("RPC chain-id check failed")?;
+    let chain_id = get_chain_id_with_retry(&provider).await?;
     if chain_id != MONAD_TESTNET_CHAIN_ID {
         bail!("refusing to run on chain {chain_id}; expected Monad Testnet 10143");
     }
@@ -204,6 +209,28 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+async fn get_chain_id_with_retry<P: Provider>(provider: &P) -> Result<u64> {
+    for attempt in 1..=CHAIN_ID_ATTEMPTS {
+        match provider.get_chain_id().await {
+            Ok(chain_id) => return Ok(chain_id),
+            Err(problem) if attempt < CHAIN_ID_ATTEMPTS => {
+                let delay_seconds = 1_u64 << (attempt - 1);
+                warn!(
+                    attempt,
+                    delay_seconds,
+                    error = %problem,
+                    "RPC chain-id check failed; retrying"
+                );
+                tokio::time::sleep(Duration::from_secs(delay_seconds)).await;
+            }
+            Err(problem) => {
+                return Err(problem).context("RPC chain-id check failed after retries");
+            }
+        }
+    }
+    unreachable!("chain-id retry loop always returns")
+}
+
 async fn run_cycle<P: Provider>(
     config: &Config,
     http: &Client,
@@ -227,9 +254,14 @@ async fn run_cycle<P: Provider>(
 
     let action = lifecycle_action(epoch_id, status, now, deadline);
     if action == LifecycleAction::Settle {
+        let observation_window = market.SETTLEMENT_OBSERVATION_WINDOW().call().await?;
+        let max_publish_time = expiry
+            .checked_add(observation_window)
+            .context("settlement observation window overflow")?;
         let proof = fetch_proof(http, &config.supra_proof_url).await?;
+        tokio::time::sleep(config.proof_chain_catchup).await;
         match oracle
-            .parseHistorical(proof.clone(), expiry, expiry + 2)
+            .parseHistorical(proof.clone(), expiry, max_publish_time)
             .call()
             .await
         {
@@ -272,6 +304,9 @@ async fn run_cycle<P: Provider>(
     };
     if needs_live_update {
         let proof = fetch_proof(http, &config.supra_proof_url).await?;
+        // Supra can be slightly ahead of the latest Monad block. Reusing this proof
+        // after a short delay avoids chasing an always-new future-dated proof.
+        tokio::time::sleep(config.proof_chain_catchup).await;
         let call = market.updateLivePrice(proof);
         let pending = tokio::time::timeout(config.transaction_timeout, call.send())
             .await

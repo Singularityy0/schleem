@@ -19,7 +19,9 @@ contract SchmecklesMarket {
     uint64 public constant TRADING_CLOSE_BUFFER = 30;
     uint64 public constant SETTLEMENT_TIMEOUT = 600;
     uint64 public constant MAX_LIVE_PRICE_AGE = 60;
-    uint64 public constant SETTLEMENT_OBSERVATION_WINDOW = 2;
+    // Supra's component feeds can advance in multi-second jumps. Fifteen seconds keeps
+    // settlement tightly bound to expiry without requiring an observation that may not exist.
+    uint64 public constant SETTLEMENT_OBSERVATION_WINDOW = 15;
     uint256 public constant BPS = 10_000;
 
     enum EpochStatus {
