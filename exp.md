@@ -134,7 +134,7 @@ For normal quoting, live prices may be at most 60 seconds old. For settlement, t
 timestamp must be inside:
 
 ```text
-[epoch expiry, epoch expiry + 2 seconds]
+[epoch expiry, epoch expiry + 15 seconds]
 ```
 
 The report can be submitted later, but the observation inside it must belong to that fixed window.
@@ -216,7 +216,7 @@ The Rust service is the automation layer:
 - fetches public EVM proof bytes from Supra Pull;
 - submits verified live prices onchain;
 - opens a new epoch when the previous one is complete;
-- polls at expiry and captures a proof in the exact two-second window;
+- polls at expiry and captures a proof in the verified 15-second window;
 - settles inside the allowed deadline; or
 - cancels a missed epoch so buyers can refund.
 
@@ -249,7 +249,7 @@ buyer's private key.
 | Mainnet readiness | No; testnet-only and unaudited |
 
 The remaining proof of readiness is operational: a deployed Testnet epoch must complete end to end
-with the keeper running continuously through its narrow settlement window.
+with the keeper running continuously through its settlement window.
 
 ## 16. A simple demo explanation
 

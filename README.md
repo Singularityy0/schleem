@@ -4,7 +4,8 @@ Schmeckles is a Monad Testnet market for five-minute MON/USD capped-call tickets
 known premium, cannot be liquidated, and can never receive more than the disclosed maximum payout.
 The contract reserves that maximum liability before every sale.
 
-If markets and options are new to you, start with [exp.md](./exp.md). Operators should use
+If markets and options are new to you, start with [exp.md](./exp.md). To fund a wallet and use the
+live website, follow [docs/USER_GUIDE.md](./docs/USER_GUIDE.md). Operators should use
 [docs/OPERATIONS.md](./docs/OPERATIONS.md).
 
 ## MVP status
@@ -15,7 +16,7 @@ If markets and options are new to you, start with [exp.md](./exp.md). Operators 
 | Test collateral | Project-created `mUSDC`; 500-token CLI faucet per wallet every 24 hours |
 | Oracle | Supra Pull proof verification; MON/USD derived from MON/USDT x USDT/USD |
 | Pricing | Fixed-point Black-Scholes call spread plus bounded Jump Guard |
-| Frontend | Contract reads, wallet writes, countdowns, accounting, and event refreshes |
+| Frontend | Contract reads, wallet writes, real-time wallet order history, accounting, and event refreshes |
 | Keeper | Rust service for Supra proofs, opening, settlement, and cancellation |
 | Network | Deployed on Monad Testnet (`10143`) |
 | Hosting | Live on Vercel at `schmeckles.vercel.app` |
@@ -56,11 +57,9 @@ contracts/
   test/                        unit, fuzz, rejection, lifecycle, and invariant tests
 keeper/                        Rust lifecycle keeper
 web/                           Next.js contract-connected frontend
-docs/SUPRA_PREFLIGHT.md        verified Supra and Monad integration details
-docs/LIVE_RELEASE.md           addresses and onchain smoke-test transactions
 docs/OPERATIONS.md             deployment and runbook
+docs/USER_GUIDE.md             beginner website, faucet, purchase, claim, and refund guide
 exp.md                         explanation from first principles
-proposal.md                    product proposal
 ```
 
 ## Verify locally
@@ -88,7 +87,7 @@ Copy `contracts/.env.example` to `contracts/.env` and use a dedicated testnet-on
 
 ```dotenv
 PRIVATE_KEY=0xYOUR_TESTNET_ONLY_KEY
-MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+MONAD_RPC_URL=https://rpc.ankr.com/monad_testnet
 SUPRA_PROOF_URL=https://rpc-testnet-dora-2.supra.com
 ```
 
@@ -101,22 +100,21 @@ Deployment and lifecycle commands are in [docs/OPERATIONS.md](./docs/OPERATIONS.
 ## Current Monad Testnet release
 
 ```text
-mUSDC:         0xF2E29cfd193c3dF30709c0f9104Cce15A82C8bb8
-Supra adapter: 0xf91F9Df392e380EAfB84F1212B222F1c33dE3673
-Market:        0x97aCD4eeBA9a42a1060BBA53dDABBe0673606985
+mUSDC:         0xAcDFc40A79302da78A095267045D7cBa2c46fa83
+Supra adapter: 0x42674E3c94787535B56Ffa1E74f7d320a5fd44e2
+Market:        0x922c22B63ae9AC7885f5b3E06067ADA853B00dd6
 Frontend:      https://schmeckles.vercel.app
 ```
 
-The identical final bytecode completed a staging smoke test: the CLI faucet funded a wallet,
-`stress-buy.ps1` bought three tickets, the contract reserved `30 mUSDC`, Supra settled with both raw
-timestamps inside the strict window, the market remained solvent, and the buyer closed the position.
-The release addresses above are a clean copy with no active epoch; starting the keeper opens epoch 1.
+This release uses a 15-second verified settlement observation window after live Supra sampling showed
+that its component feeds can advance in multi-second jumps. The keeper continuously opens and settles
+epochs while it is running.
 
 ## Security boundary
 
 This is unaudited testnet software. It rejects unverified or malformed proofs, missing/duplicate
 pairs, zero prices, unsupported decimals, stale/future live observations, and settlements unless
-both feed timestamps are inside `[expiry, expiry + 2 seconds]`. Those checks are not a security audit
+both feed timestamps are inside `[expiry, expiry + 15 seconds]`. Those checks are not a security audit
 or a claim that the pricing model is economically correct.
 
 Not financial advice.

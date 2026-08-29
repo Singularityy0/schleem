@@ -23,12 +23,16 @@ Edit `contracts/.env`:
 
 ```dotenv
 PRIVATE_KEY=0xYOUR_TESTNET_ONLY_DEPLOYER_AND_KEEPER_KEY
-MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+MONAD_RPC_URL=https://rpc.ankr.com/monad_testnet
 SUPRA_PROOF_URL=https://rpc-testnet-dora-2.supra.com
 ```
 
+For the continuously polling keeper, prefer a separate provider endpoint such as
+`https://rpc.ankr.com/monad_testnet`; Monad's shared QuickNode endpoint can return global `429`
+responses even when one keeper is below its nominal per-second limit.
+
 The private key may omit `0x`; the entry points normalize valid 64-character hex in memory. Never
-put it in the frontend, Vercel, or Git. See [SUPRA_PREFLIGHT.md](./SUPRA_PREFLIGHT.md).
+put it in the frontend, Vercel, or Git.
 
 ## 3. Verify the release
 
@@ -75,22 +79,38 @@ Verify all three addresses have bytecode before continuing.
 Current release addresses:
 
 ```dotenv
-MUSDC_ADDRESS=0xF2E29cfd193c3dF30709c0f9104Cce15A82C8bb8
-SUPRA_ORACLE_ADDRESS=0xf91F9Df392e380EAfB84F1212B222F1c33dE3673
-MARKET_ADDRESS=0x97aCD4eeBA9a42a1060BBA53dDABBe0673606985
+MUSDC_ADDRESS=0xAcDFc40A79302da78A095267045D7cBa2c46fa83
+SUPRA_ORACLE_ADDRESS=0x42674E3c94787535B56Ffa1E74f7d320a5fd44e2
+MARKET_ADDRESS=0x922c22B63ae9AC7885f5b3E06067ADA853B00dd6
 ```
 
-The keeper reads `contracts/.env` from the repository root or `../contracts/.env` from `keeper/`.
+The keeper reads `keeper/.env` first when launched from `keeper/`, then falls back to
+`contracts/.env`. Real process environment variables retain highest priority.
 
 ```powershell
 cd keeper
 cargo run --release
 ```
 
+For a free local deployment, copy the keeper-specific template and keep this terminal running for
+the entire trading and settlement window:
+
+```powershell
+cd keeper
+Copy-Item .env.example .env
+# Edit keeper/.env with the dedicated keeper key and current release addresses.
+cargo run --release
+```
+
+The keeper accepts no inbound traffic, so it does not need a public URL or port. The machine must
+remain powered on, awake, and connected to the internet.
+
 Expected first run: verify chain `10143`, fetch and submit a Supra proof, then open epoch 1. Keep the
-process running continuously: Supra's endpoint returns the latest proof, so the one-second polling loop
-must capture both feed timestamps inside the two-second settlement window. Submission and receipt
-waits are bounded to 45 seconds so a degraded RPC cannot silently freeze the lifecycle.
+process running continuously: Supra's endpoint returns the latest proof, so the one-second polling
+loop must capture both feed timestamps inside the verified settlement window. Each fetched proof is
+held for 2.5 seconds before submission so Monad's block clock can catch up without replacing it with
+another future-dated proof. Submission and receipt waits are bounded to 45 seconds so a degraded RPC
+cannot silently freeze the lifecycle.
 
 For one diagnostic cycle:
 
@@ -100,46 +120,25 @@ cargo run --release
 Remove-Item Env:KEEPER_ONCE
 ```
 
-### Deploy the keeper to Render
-
-The repository root includes `render.yaml` for a single native Rust background worker. In Render,
-create a **Blueprint**, connect this repository, and select the root `render.yaml`. Render will ask
-for the two values marked `sync: false`:
-
-```dotenv
-MONAD_RPC_URL=https://YOUR_DEDICATED_MONAD_TESTNET_RPC
-PRIVATE_KEY=0xYOUR_TESTNET_ONLY_KEEPER_KEY
-```
-
-The blueprint already contains the current market, Supra adapter, public Supra proof endpoint, and
-safe polling defaults. If deploying a new contract release, replace `MARKET_ADDRESS` and
-`SUPRA_ORACLE_ADDRESS` in the Render service environment with the new addresses. Keep exactly one
-worker instance running. Render background workers do not have a free plan; the blueprint requests
-the `starter` plan.
-
-After deployment, the logs must show chain ID `10143`, a successful Supra live-price update, and an
-epoch-open transaction. A build completing by itself is not proof that the keeper is operating.
-
-To rotate the current release to a fresh keeper wallet before deploying it, leave the current owner
-key only in ignored `contracts/.env` and run:
+To rotate the current release to a fresh local keeper wallet, leave the current owner key only in
+ignored `contracts/.env` and run:
 
 ```powershell
 cd contracts
 .\scripts\set-keeper.ps1 -NewKeeperAddress 0xYOUR_NEW_KEEPER_WALLET_ADDRESS
 ```
 
-Then put only the fresh keeper wallet's private key in Render. The owner key never belongs in Render.
+Then put only the fresh keeper wallet's private key in ignored `keeper/.env`. Keep the owner key out
+of the keeper process.
 
 ## 6. Fund a buyer with mUSDC
 
-There is no web faucet. On the buyer's machine:
+There is no web faucet. On the buyer's machine, use the private key of the same disposable testnet
+account connected to the website:
 
 ```powershell
 cd contracts
-$env:PRIVATE_KEY='0xBUYER_TESTNET_ONLY_KEY'
-$env:MUSDC_ADDRESS='0xDEPLOYED_MUSDC'
-$env:MONAD_RPC_URL='https://testnet-rpc.monad.xyz'
-.\scripts\faucet.ps1
+.\scripts\faucet.ps1 -PromptForPrivateKey
 ```
 
 The caller receives exactly `500 mUSDC` once per 24 hours. They still need test MON for faucet,
@@ -161,7 +160,7 @@ Copy `web/.env.example` to `web/.env.local` and set only public values:
 ```dotenv
 NEXT_PUBLIC_MARKET_ADDRESS=0xDEPLOYED_MARKET
 NEXT_PUBLIC_MUSDC_ADDRESS=0xDEPLOYED_MUSDC
-NEXT_PUBLIC_MONAD_RPC_URL=https://testnet-rpc.monad.xyz
+NEXT_PUBLIC_MONAD_RPC_URL=https://rpc.ankr.com/monad_testnet
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
@@ -181,10 +180,10 @@ Go only when:
 - market collateral/oracle addresses and keeper match the release;
 - the market holds `10,000 mUSDC` initial collateral;
 - a real Supra proof refreshes the live price;
-- an epoch opens, locks, and settles with both timestamps in `[expiry, expiry + 2]`;
+- an epoch opens, locks, and settles with both timestamps in `[expiry, expiry + 15]`;
 - a buyer can faucet, approve, buy, and claim;
 - a missed settlement can cancel and refund;
-- frontend event refreshes mirror onchain state; and
+- frontend event refreshes mirror onchain state and wallet order history; and
 - no private key appears in Git, browser bundles, Vercel variables, or logs.
 
 This is testnet-only, unaudited software.
