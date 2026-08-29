@@ -1,0 +1,27 @@
+.tools/
+artifacts/
+
+# Foundry
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+contracts/.env
+
+# Web
+web/node_modules/
+web/dist/
+web/.vinext/
+web/.next/
+web/.vercel/
+web/.env
+web/.env.local
+web/.dev.vars
+
+# Keeper
+keeper/target/
+
+# Secrets and OS files
+.env
+*.key
+.DS_Store
+Thumbs.db
