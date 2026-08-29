@@ -1,4 +1,9 @@
-param([string]$TokenAddress, [string]$RpcUrl, [string]$PrivateKey)
+param(
+    [string]$TokenAddress,
+    [string]$RpcUrl,
+    [string]$PrivateKey,
+    [switch]$PromptForPrivateKey
+)
 
 $ErrorActionPreference = 'Stop'
 $contractsRoot = Split-Path -Parent $PSScriptRoot
@@ -15,7 +20,17 @@ if (Test-Path -LiteralPath $envPath) {
 }
 $TokenAddress = if ($TokenAddress) { $TokenAddress } else { $env:MUSDC_ADDRESS }
 $RpcUrl = if ($RpcUrl) { $RpcUrl } else { $env:MONAD_RPC_URL }
-$PrivateKey = if ($PrivateKey) { $PrivateKey } else { $env:PRIVATE_KEY }
+if ($PromptForPrivateKey) {
+    $secureKey = Read-Host 'Enter the testnet-only private key for the wallet receiving mUSDC' -AsSecureString
+    $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+    try {
+        $PrivateKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
+    }
+} else {
+    $PrivateKey = if ($PrivateKey) { $PrivateKey } else { $env:PRIVATE_KEY }
+}
 
 if ($PrivateKey -match '^[0-9a-fA-F]{64}$') {
     $PrivateKey = "0x$PrivateKey"
