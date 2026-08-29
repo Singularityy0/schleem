@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-heading);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+:root {
+  --background: #09090c;
+  --foreground: #f4f4f5;
+  --card: #111117;
+  --card-foreground: #f4f4f5;
+  --popover: #111117;
+  --popover-foreground: #f4f4f5;
+  --primary: #cbff5a;
+  --primary-foreground: #101307;
+  --secondary: #22222a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #1c1c23;
+  --muted-foreground: #a1a1aa;
+  --accent: #25252e;
+  --accent-foreground: #fafafa;
+  --destructive: #fb7185;
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.11);
+  --ring: #a78bfa;
+  --signal: #cbff5a;
+  --radius: 0.75rem;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: "Arial Narrow", Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  border-color: var(--border);
+  outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+}
+
+html {
+  background: var(--background);
+  color-scheme: dark;
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+button {
+  cursor: pointer;
+}
+
+.risk-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    radial-gradient(circle at 80% 10%, rgba(139, 92, 246, 0.08), transparent 30%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+}
+
+.term-cell {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 0.75rem;
+}
+
+.term-cell span {
+  display: block;
+  color: #71717a;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.term-cell strong {
+  display: block;
+  margin-top: 0.3rem;
+  color: #e4e4e7;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.term-cell small {
+  display: block;
+  margin-top: 0.15rem;
+  color: #52525b;
+  font-size: 0.625rem;
+}
+
+.quote-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #71717a;
+}
+
+.quote-row span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.quote-row svg {
+  height: 0.75rem;
+  width: 0.75rem;
+}
+
+.quote-row strong {
+  color: #d4d4d8;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .term-cell:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
