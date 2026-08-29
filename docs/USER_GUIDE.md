@@ -377,5 +377,5 @@ Do not repeatedly click. Check the wallet activity and Monad explorer, then refr
 [ ] After expiry, I claimed payout or refund when the button appeared.
 ```
 
-For the underlying options and pricing theory, read [exp.md](../exp.md). For keeper and deployment
-operations, read [OPERATIONS.md](./OPERATIONS.md).
+For the underlying research, options math, and mechanism design, read [README.md](../README.md).
+For keeper and deployment operations, read [OPERATIONS.md](./OPERATIONS.md).
